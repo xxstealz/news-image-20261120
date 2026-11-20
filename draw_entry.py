@@ -8,6 +8,8 @@ strip, and a three-item footer. News verified 20 Nov 2026 from
 Reuters, CNN, ANI/PTI, IMD and Sensor Tower estimates.
 """
 import math
+import os
+from functools import lru_cache
 from PIL import Image, ImageDraw, ImageFont
 
 W, H = 1024, 1024
@@ -21,14 +23,39 @@ RULE = (201, 194, 174)
 ORANGE = (214, 110, 30)
 TEAL = (18, 110, 105)
 
-FONT_DIR = "/usr/share/fonts/truetype/liberation/"
+def _font_dir():
+    """Find the Liberation font directory instead of assuming one path.
+
+    The primary location is checked first, so on this machine the
+    resolved files — and therefore the drawn bytes — are unchanged.
+    A missing font used to surface as a bare FileNotFoundError from
+    deep inside PIL; now the failure names what was looked for.
+    """
+    for cand in (
+        "/usr/share/fonts/truetype/liberation/",
+        "/usr/share/fonts/liberation/",
+    ):
+        if os.path.exists(cand + "LiberationSerif-Bold.ttf"):
+            return cand
+    raise FileNotFoundError(
+        "Liberation fonts not found; checked "
+        "/usr/share/fonts/truetype/liberation/ and "
+        "/usr/share/fonts/liberation/"
+    )
+
+
+FONT_DIR = _font_dir()
 SERIF = FONT_DIR + "LiberationSerif-Bold.ttf"
 SERIF_REG = FONT_DIR + "LiberationSerif-Regular.ttf"
 SANS = FONT_DIR + "LiberationSans-Regular.ttf"
 SANS_B = FONT_DIR + "LiberationSans-Bold.ttf"
 
 
+@lru_cache(maxsize=None)
 def font(path, size):
+    # The same few (path, size) pairs are requested dozens of times
+    # per build; cache them instead of re-reading the TTF from disk
+    # on every call. Cached objects render identically.
     return ImageFont.truetype(path, size)
 
 
